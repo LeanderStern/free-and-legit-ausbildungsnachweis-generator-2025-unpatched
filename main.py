@@ -171,6 +171,8 @@ def main():
         raise FileNotFoundError(f"No template file found at {TEMPLATE_PATH}")
 
     for file_path in INPUT_PATH.iterdir():
+        if file_path.name.startswith("."):
+            continue
         workdays = get_workdays_from_workbook(file_path)
         for workday in workdays:
             while workday.date > _ACTIVE_WORKSHEET_END_DATE:
