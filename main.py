@@ -1,4 +1,3 @@
-import calendar
 import locale
 import re
 from datetime import datetime, timedelta
@@ -157,6 +156,9 @@ def duplicate_and_activate_new_worksheet() -> None:
             break
     else:
         raise ValueError("No cell with integer value found in the first row of the template worksheet")
+
+    date_format = "%d.%m.%y"
+    _WORKBOOK.active.title = f"{(_ACTIVE_WORKSHEET_END_DATE - timedelta(days=4)).strftime(date_format)} - {_ACTIVE_WORKSHEET_END_DATE.strftime(date_format)}"
 
 def main():
     global _WORKBOOK
