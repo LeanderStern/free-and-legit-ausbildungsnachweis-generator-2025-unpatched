@@ -8,6 +8,7 @@ class WorkDay(PydanticBaseModel):
     date: datetime
     hours_worked: float
     text: str
+    location: str | None
 
     @cached_property
     def normalized_day_name(self) -> str:

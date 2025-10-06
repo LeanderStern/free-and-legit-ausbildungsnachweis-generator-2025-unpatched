@@ -21,32 +21,22 @@ YEAR_KEY = "jahr"
 MONTH_KEY = "monat"
 TEXT_KEY = "kommentar"
 WORKSHEET_KEY = "buchungen"
-
-@validate_call
-def get_active_worksheet_end_date() -> datetime:
-    start_weekday = START_APPRENTICESHIP.weekday()
-
-    # This checks if it's Saturday (5) or Sunday (6)
-    if start_weekday == 5 or start_weekday == 6:
-        # C2 + (7 - WEEKDAY(C2,3)) - moves to next Monday
-        result_date = START_APPRENTICESHIP + timedelta(days=(7 - start_weekday))
-    else:
-        # Nested IF: IF(WEEKDAY(C2,3)=0, C2, C2-WEEKDAY(C2,3))
-        if start_weekday == 0:  # Monday
-            result_date = START_APPRENTICESHIP
-        else:  # Tuesday to Friday
-            # Move back to Monday of the same week
-            result_date = START_APPRENTICESHIP - timedelta(days=start_weekday)
-
-    # Add the weekly offset and 4 days to get to the end of the work week (Friday)
-    weekly_offset = (_WORKSHEET_INDEX - 1) * 7
-    worksheet_end_date = result_date + timedelta(days=weekly_offset) + timedelta(days=4)
-
-    return worksheet_end_date
+VACATION_ALIAS_KEY = "urlaub"
+SICK_DAY_ALIAS_KEY = "krank tage"
+SCHOOL_ALIAS_KEY = "zpe azubi ext"
 
 _WORKBOOK: Workbook | None = None
 _WORKSHEET_INDEX = 1
 _ACTIVE_WORKSHEET_END_DATE: datetime | None = None
+
+def alias_to_location(alias: str) -> str | None:
+    normalized_alias = alias.lower().strip()
+    if normalized_alias == VACATION_ALIAS_KEY or normalized_alias == SICK_DAY_ALIAS_KEY:
+        return None
+    elif normalized_alias == SCHOOL_ALIAS_KEY:
+        return "HEINZ NIXDORF BERUFSKOLLEG"
+    else:
+        return "SOPTIM AG"
 
 @validate_call
 def get_workdays_from_workbook(workbook_path: Path) -> list[WorkDay]:
@@ -66,22 +56,31 @@ def get_workdays_from_workbook(workbook_path: Path) -> list[WorkDay]:
 
     start_row_data, key_column_positions = get_key_positions_in_worksheet(data_sheet, HOUR_KEY, TEXT_KEY, DATE_KEY)
     work_days: list[WorkDay] = list()
-    while True:
+    while start_row_data <= data_sheet.max_row:
         start_row_data += 1
         if data_sheet.cell(row=start_row_data, column=key_column_positions[HOUR_KEY]).data_type != 'n':
             break
 
         hours = data_sheet.cell(row=start_row_data, column=key_column_positions[HOUR_KEY]).value
+        alias = data_sheet.cell(row=start_row_data,column=key_column_positions[HOUR_KEY] + 1).value
+        normalized_alias = alias.lower().strip()
         text = data_sheet.cell(row=start_row_data, column=key_column_positions[TEXT_KEY]).value
         if text is None:
-            text = data_sheet.cell(row=start_row_data, column=key_column_positions[HOUR_KEY] + 1).value
-        date_string = data_sheet.cell(row=start_row_data, column=key_column_positions[DATE_KEY]).value
+            if normalized_alias == VACATION_ALIAS_KEY:
+                text = "Urlaub"
+            elif normalized_alias == SICK_DAY_ALIAS_KEY:
+                text = "Krank"
+            else:
+                text = alias
 
+        date_string = data_sheet.cell(row=start_row_data, column=key_column_positions[DATE_KEY]).value
         # Extract digits from date_string to form the day
         day = int(''.join(re.findall(r'\d', date_string)))
         date = datetime(year=year, month=month, day=day)
 
-        work_days.append(WorkDay(date=date, hours_worked=hours, text=text))
+        work_days.append(WorkDay(date=date, hours_worked=hours, text=text, location=alias_to_location(normalized_alias)))
+    else:
+        raise ValueError("No terminating condition found for workday entries")
     return work_days
 
 
@@ -111,7 +110,6 @@ def get_key_positions_in_worksheet(worksheet: Worksheet, *keys: str) -> tuple[in
         return row_index + 1, key_column_positions
     raise ValueError(f"Keys {key_set} not found in any row of worksheet")
 
-
 @validate_call(config=ConfigDict(arbitrary_types_allowed=True))
 def insert_workday_into_workbook(work_day: WorkDay) -> None:
     merged_cell_ranges = _WORKBOOK.active.merged_cells.ranges
@@ -120,22 +118,26 @@ def insert_workday_into_workbook(work_day: WorkDay) -> None:
 
     # Find the first empty cell in the merged range for the day
     text_cell: Cell | None = None
+    last_row_merged_cells_day: int | None = None
     for merged_cells in merged_cell_ranges:
         if day_cell.coordinate not in merged_cells:
             continue
 
-        for index_row in range(merged_cells.min_row, merged_cells.max_row):
+        for index_row in range(merged_cells.min_row, merged_cells.max_row + 1):
             cell = _WORKBOOK.active.cell(index_row, column_position[work_day.normalized_day_name] + 1)
             if not cell.value:
-                cell.value = work_day.text
                 text_cell = cell
+                text_cell.value = work_day.text
+                last_row_merged_cells_day = merged_cells.max_row
                 break
     if text_cell is None:
         raise ValueError(f"No empty cell found for day {work_day.normalized_day_name}")
 
     for merged_cells in merged_cell_ranges:
         if text_cell.coordinate in merged_cells:
+
             _WORKBOOK.active.cell(text_cell.row, merged_cells.max_col + 1).value = work_day.hours_worked
+            _WORKBOOK.active.cell(last_row_merged_cells_day, merged_cells.max_col + 3).value = work_day.location
             break
     else:
         raise ValueError(f"Junge wie ist das überhaupt möglich")
@@ -151,7 +153,12 @@ def duplicate_and_activate_new_worksheet() -> None:
     for cell in first_row:
         if cell.value and isinstance(cell.value, int):
             cell.value = _WORKSHEET_INDEX
-            _ACTIVE_WORKSHEET_END_DATE = get_active_worksheet_end_date()
+
+            start_weekday = START_APPRENTICESHIP.weekday()
+            # Move back to the Monday of the same week
+            start_monday = START_APPRENTICESHIP - timedelta(days=start_weekday)
+            _ACTIVE_WORKSHEET_END_DATE = start_monday + timedelta(days=4, weeks=_WORKSHEET_INDEX - 1)
+
             _WORKSHEET_INDEX += 1
             break
     else:
