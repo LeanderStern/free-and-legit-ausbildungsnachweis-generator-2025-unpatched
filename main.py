@@ -24,6 +24,8 @@ WORKSHEET_KEY = "buchungen"
 VACATION_ALIAS_KEY = "urlaub"
 SICK_DAY_ALIAS_KEY = "krank tage"
 SCHOOL_ALIAS_KEY = "zpe azubi ext"
+SCHOOL_LOCATION_NAME = "HEINZ NIXDORF BERUFSKOLLEG"
+COMPANY_LOCATION_NAME = "SOPTIM AG"
 
 _WORKBOOK: Workbook | None = None
 _WORKSHEET_INDEX = 1
@@ -34,9 +36,9 @@ def alias_to_location(alias: str) -> str | None:
     if normalized_alias == VACATION_ALIAS_KEY or normalized_alias == SICK_DAY_ALIAS_KEY:
         return None
     elif normalized_alias == SCHOOL_ALIAS_KEY:
-        return "HEINZ NIXDORF BERUFSKOLLEG"
+        return SCHOOL_LOCATION_NAME
     else:
-        return "SOPTIM AG"
+        return COMPANY_LOCATION_NAME
 
 @validate_call
 def get_workdays_from_workbook(workbook_path: Path) -> list[WorkDay]:
@@ -78,6 +80,7 @@ def get_workdays_from_workbook(workbook_path: Path) -> list[WorkDay]:
         day = int(''.join(re.findall(r'\d', date_string)))
         date = datetime(year=year, month=month, day=day)
 
+        print(f"inserting {hours} hours for {date.date()}")
         work_days.append(WorkDay(date=date, hours_worked=hours, text=text, location=alias_to_location(normalized_alias)))
     else:
         raise ValueError("No terminating condition found for workday entries")
@@ -169,7 +172,7 @@ def duplicate_and_activate_new_worksheet() -> None:
 
 def main():
     global _WORKBOOK
-    locale.setlocale(locale.LC_TIME, "")
+    locale.setlocale(locale.LC_TIME, "de_DE")
 
     first_file_in_template_dir = next(TEMPLATE_PATH.iterdir())
     if first_file_in_template_dir.exists():
