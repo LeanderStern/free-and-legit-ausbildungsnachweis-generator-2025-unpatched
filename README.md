@@ -4,8 +4,8 @@
 
 1. Download the zip file from releases.
 2. Extract it.
-3. Put all the .xlsx files in the `input` folder.
-4. If you want, edit the provided `.xltx` file in the `template` folder.
+3. Put all the .xlsx files from mak in the `input` folder.
+4. Edit the **name** and **apprenticeship start** in the `.xltx` file inside the `template` folder.
 5. Run `main.exe`.
 
 ## Requirements
@@ -32,7 +32,7 @@
 conda env create -f environment.yml
 ```
 
-## Usage
+## Uncompiled Usage
 
 1. Put all the .xlsx files in the `input` folder.
 2. Run the application using `python main.py`.
