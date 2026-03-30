@@ -5,7 +5,7 @@
 1. Download the zip file from releases.
 2. Extract it.
 3. Put all the .xlsx files from mak in the `input` folder.
-4. Edit the **name** and **apprenticeship start** in the `.xltx` file inside the `template` folder.
+4. Edit the **name** and **apprenticeship start date** in the `.xltx` file inside the `template` folder.
 5. Run `main.exe`.
 
 ## Requirements
